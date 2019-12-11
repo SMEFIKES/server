@@ -1,0 +1,70 @@
+-?-
+    -->
+        inspect-neighbours
+        -?-
+            -->
+                inspect self hp <= 30%
+                select-neighbour
+                calculate-flee-direction
+                move
+
+            -->
+                inspect self prepared_to_attack is true
+                select-neighbour
+                calculate-attack-direction
+                move
+
+            -->
+                inspect any prepared_to_defence is true
+                select-inspected
+                -?-
+                    -->
+                        random 0.2
+                        calculate-flee-direction
+                        move
+
+                    prepare-to-battle attack
+
+            -->
+                inspect any prepared_to_attack is true
+                select-inspected
+                -?-
+                    -->
+                        inspect self prepared_to_defence is true
+                        wait
+
+                    -->
+                        random 0.3
+                        calculate-flee-direction
+                        move
+
+                    -->
+                        random 0.8
+                        prepare-to-battle defence
+
+                    prepare-to-battle attack
+            -->
+                select-neighbour
+                -?-
+                    -->
+                        random 0.2
+                        calculate-flee-direction
+                        move
+
+                    prepare-to-battle attack
+
+    -?-
+        -->
+            inspect self stamina < 50%
+            wait
+
+        -->
+            -?-
+                -->
+                    random 0.7
+                    calculate-previous-direction
+                    check-direction
+
+                calculate-random-direction
+
+            move

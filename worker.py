@@ -90,7 +90,7 @@ class Worker:
                 recipient,
                 GameInitializedResponseSerializer().dump({
                     'players': self.game.players.values(),
-                    'creatures': self.game.creatures.values(),
+                    'actors': self.game.actors.values(),
                     'map': self.game.map
                 })
             )
@@ -103,7 +103,7 @@ class Worker:
     async def handle_move(self, data):
         player_name = self.reverse_players_mapping[data['id']]
         player = self.game.players[player_name]
-        movement_result = self.game.move_creature(player.id, data['direction'])
+        movement_result = self.game.move_actor(player.id, data['direction'])
         await self.send_response(None, movement_result.serialized)
 
     async def handle_prepare_to_battle(self, data):

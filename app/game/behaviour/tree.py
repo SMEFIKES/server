@@ -4,7 +4,7 @@ from enum import IntEnum, auto
 from typing import List
 
 from app.game.handler import GameHandler
-from ..creatures import Creature
+from ..actors import Actor
 
 
 class STATUS(IntEnum):
@@ -18,7 +18,7 @@ class Tree:
         self.name = None
         self.root = root
 
-    def update(self, actor: Creature, game: GameHandler) -> STATUS:
+    def update(self, actor: Actor, game: GameHandler) -> STATUS:
         return self.root.process_update(actor, game)
 
     def _print_node(self, level, node):
@@ -72,13 +72,13 @@ class Node:
             node = node.parent
         return node
 
-    def process_update(self, actor: Creature, game: GameHandler) -> STATUS:
+    def process_update(self, actor: Actor, game: GameHandler) -> STATUS:
         status = self.update(actor, game)
         self.last_actor = actor
         self.last_status = status
         return status
 
-    def update(self, actor: Creature, game: GameHandler) -> STATUS:
+    def update(self, actor: Actor, game: GameHandler) -> STATUS:
         return STATUS.SUCCESS
 
     def add_child(self, child: Node):

@@ -34,7 +34,6 @@ class WSServer(web.Application):
 
         try:
             async for msg in ws:
-                print(msg)
                 if msg.type == WSMsgType.TEXT:
                     try:
                         processor, response = serializer.loads(msg.data)
@@ -74,12 +73,10 @@ class WSServer(web.Application):
                     for ws_id in recipients:
                         session = app['websockets'].get(ws_id)
                         if session:
-                            print(f'Message sent: {msg}')
                             await session['ws'].send_json(msg)
 
                 else:
                     for session in app['websockets'].values():
-                        print(f'Message sent: {msg}')
                         await session['ws'].send_json(msg)
 
         except asyncio.CancelledError:

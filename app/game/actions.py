@@ -2,7 +2,7 @@ from dataclasses import dataclass
 from enum import IntEnum, auto
 from typing import Optional, Union
 
-from app.game.creatures import Creature
+from app.game.actors import Actor
 from app.game.worldgen import Tile
 from app.server.serializers import MoveResponseSerializer, AttackResponseSerializer, PrepareToBattleResponseSerializer
 from app.utils.geometry import Vector
@@ -12,11 +12,11 @@ from app.utils.geometry import Vector
 class BlockedMovement:
     class REASONS(IntEnum):
         OBSTACLE = auto()
-        CREATURE = auto()
+        ACTOR = auto()
         OUT = auto()
 
     reason: REASONS
-    object: Union[Creature, Tile, None]
+    object: Union[Actor, Tile, None]
 
 
 @dataclass
@@ -25,7 +25,7 @@ class BaseAction:
     stamina_cost = 1
 
     occurrence_time: int
-    actor: Creature
+    actor: Actor
 
     serializer = None
 
@@ -48,7 +48,7 @@ class MoveAction(BaseAction):
 
 @dataclass
 class AttackAction(BaseAction):
-    defender: Creature
+    defender: Actor
     success: bool
     defender_alive: bool
     damage: int

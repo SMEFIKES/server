@@ -1,10 +1,10 @@
 from concurrent.futures import ProcessPoolExecutor
 import asyncio
 import random
-from typing import Dict
+from typing import Dict, Tuple, Optional
 
 from .actions import MoveAction, BlockedMovement, AttackAction, PrepareToBattleAction
-from .creatures import Creature
+from .actors import Actor
 from ..utils.geometry import Vector
 from ..utils.constants import Directions
 from .worldgen import Tile, Canvas, BiomeGenerator, WIDE_TILESET
@@ -13,8 +13,8 @@ from .worldgen import Tile, Canvas, BiomeGenerator, WIDE_TILESET
 class GameHandler:
     def __init__(self):
         self.initialized = False
-        self.players: Dict[str, Creature] = {}
-        self.creatures: Dict[str, Creature] = {}
+        self.players: Dict[str, Actor] = {}
+        self.actors: Dict[str, Actor] = {}
         self.time = 0
         self.world_size = Vector(1, 1)
         self.region_size = Vector(30, 15)
@@ -23,6 +23,7 @@ class GameHandler:
             self.region_size.y * self.world_size.y,
             Tile.GROUND
         )
+        self._actors_positions: Dict[Tuple[int, int], Actor] = {}
         self._to_kill = []
 
     async def initialize(self):
@@ -46,10 +47,10 @@ class GameHandler:
             self.set_initial_player_position(player)
 
         for _ in range(20):
-            goblin = Creature('<Goblin>', 'goblin')
-            goblin.position = self.get_free_position()
-            goblin.group = 1
-            self.creatures[goblin.id] = goblin
+            goblin = Actor('<Goblin>', 'goblin')
+            self.place_actor(goblin, self.get_free_position())
+            goblin.faction = 1
+            self.actors[goblin.id] = goblin
 
         self.initialized = True
 
@@ -72,30 +73,37 @@ class GameHandler:
 
         actions = []
 
-        for creature in self.creatures.values():
-            creature.actions_in_round = 0
+        for actor in self.actors.values():
+            actor.actions_in_round = 0
 
-            if creature.stamina < creature.max_stamina:
-                creature.stamina = min(creature.max_stamina, creature.stamina + creature.energy_regeneration)
-                creature.handle_exhausting(self.time)
+            if actor.stamina < actor.max_stamina:
+                actor.stamina = min(actor.max_stamina, actor.stamina + actor.energy_regeneration)
+                actor.handle_exhausting(self.time)
 
-            if creature.stamina <= 0 or creature.hp <= 0:
+            if actor.stamina <= 0 or actor.hp <= 0:
                 continue
 
-            if creature.kind == 'player':
+            if actor.kind == 'player':
                 continue
 
-            if self.time < creature.next_action_time:
+            if self.time < actor.next_action_time:
                 continue
 
-            behaviour_tree = get_tree(creature.kind)
-            behaviour_tree.update(creature, self)
-            if creature.acted:
-                actions.append(creature.last_action)
+            behaviour_tree = get_tree(actor.kind)
+            behaviour_tree.update(actor, self)
+            if actor.acted:
+                actions.append(actor.last_action)
+
+        player = next(iter(self.players.values()))
+        from .behaviour.actions.select_actors import FindNeighbours
+        n = FindNeighbours()
+        print(n.update(player, self))
+        print(self.time, player.recall_knowledge('found_actors'))
 
         if self._to_kill:
-            for creature_id in self._to_kill:
-                del self.creatures[creature_id]
+            for actor_id in self._to_kill:
+                actor = self.actors.pop(actor_id)
+                del self._actors_positions[actor.position.x, actor.position.y]
                 self._to_kill.clear()
 
         return actions
@@ -107,9 +115,8 @@ class GameHandler:
         if not (tile := self.map[x, y]).passable:
             return BlockedMovement(BlockedMovement.REASONS.OBSTACLE, tile)
 
-        for creature in self.creatures.values():
-            if creature.position.equals(x, y):
-                return BlockedMovement(BlockedMovement.REASONS.CREATURE, creature)
+        if (actor := self.get_actor_at(Vector(x, y))) is not None:
+            return BlockedMovement(BlockedMovement.REASONS.ACTOR, actor)
 
         return True
 
@@ -134,48 +141,60 @@ class GameHandler:
 
             if self.is_available_position(x, y) is True:
                 player = self.players[name]
-                player.position.set(x, y)
+                self.place_actor(player, Vector(x, y))
                 return
 
     def add_player(self, name):
-        creature = Creature(name, 'player')
-        self.players[name] = creature
-        self.creatures[creature.id] = creature
+        actor = Actor(name, 'player')
+        self.players[name] = actor
+        self.actors[actor.id] = actor
         if self.initialized:
             self.set_initial_player_position(name)
 
-    def move_creature(self, creature_id, direction):
-        creature = self.creatures[creature_id]
-        delta = Directions.delta(direction)
-        new_position = creature.position + delta
+    def place_actor(self, actor: Actor, position: Vector):
+        current_position = (actor.position.x, actor.position.y)
+        if self._actors_positions.get(current_position) is actor:
+            self._actors_positions[current_position] = None
 
-        if creature.stamina <= 0 or creature.next_action_time > self.time:
-            return MoveAction(self.time, creature, False, None, direction)
+        self._actors_positions[position.x, position.y] = actor
+        actor.position = position
+
+    def get_actor_at(self, position: Vector) -> Optional[Actor]:
+        return self._actors_positions.get((position.x, position.y))
+
+    def move_actor(self, actor_id, direction):
+        actor = self.actors[actor_id]
+        delta = Directions.delta(direction)
+        new_position = actor.position + delta
+
+        if actor.stamina <= 0 or actor.next_action_time > self.time:
+            return MoveAction(self.time, actor, False, None, direction)
 
         destination_available = self.is_available_position(new_position.x, new_position.y)
         if isinstance(destination_available, BlockedMovement):
-            if destination_available.reason == BlockedMovement.REASONS.CREATURE:
-                return self.attack_creature(creature_id, destination_available.object.id)
+            if destination_available.reason == BlockedMovement.REASONS.ACTOR:
+                return self.attack_actor(actor_id, destination_available.object.id)
 
-            return MoveAction(self.time, creature, False, None, direction)
+            return MoveAction(self.time, actor, False, None, direction)
 
         tile = self.map[new_position.x, new_position.y]
         if tile == Tile.BUSH:
-            creature.stamina -= 5
+            actor.stamina -= 5
         elif tile == Tile.ROCK:
-            creature.stamina -= 20
-        creature.handle_exhausting(self.time)
-        creature.attack_energy = creature.defence_energy = 0
+            actor.stamina -= 20
+        actor.handle_exhausting(self.time)
+        actor.attack_energy = actor.defence_energy = 0
 
-        previous, creature.position = creature.position, new_position
-        return MoveAction(self.time, creature, True, previous, direction)
+        previous = actor.position
+        self.place_actor(actor, new_position)
+        return MoveAction(self.time, actor, True, previous, direction)
 
-    def kill(self, creature):
-        self._to_kill.append(creature.id)
+    def kill(self, actor):
+        self._to_kill.append(actor.id)
 
-    def attack_creature(self, attacker_id, defender_id):
-        attacker = self.creatures[attacker_id]
-        defender = self.creatures[defender_id]
+    def attack_actor(self, attacker_id, defender_id):
+        attacker = self.actors[attacker_id]
+        defender = self.actors[defender_id]
 
         if attacker.stamina <= 0 or attacker.next_action_time > self.time:
             return AttackAction(self.time, attacker, defender, False, True, 0)
@@ -201,7 +220,7 @@ class GameHandler:
         return AttackAction(self.time, attacker, defender, True, True, damage)
 
     def prepare_to_battle(self, actor_id, action_type, energy):
-        actor = self.creatures[actor_id]
+        actor = self.actors[actor_id]
         if action_type == 'attack':
             actor.attack_energy = energy
             actor.defence_energy = 0
@@ -209,3 +228,6 @@ class GameHandler:
             actor.attack_energy = 0
             actor.defence_energy = energy
         return PrepareToBattleAction(self.time, actor, action_type, energy)
+
+    def get_tile_movement_cost(self, actor: Actor, current: Vector, candidate: Vector) -> int:
+        pass

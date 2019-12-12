@@ -1,16 +1,16 @@
 -?-
     -->
-        inspect-neighbours
+        find-neighbours
         -?-
             -->
                 inspect self hp <= 30%
-                select-neighbour
+                select-one
                 calculate-flee-direction
                 move
 
             -->
                 inspect self prepared_to_attack is true
-                select-neighbour
+                select-one
                 calculate-attack-direction
                 move
 
@@ -44,7 +44,7 @@
 
                     prepare-to-battle attack
             -->
-                select-neighbour
+                select-one
                 -?-
                     -->
                         random 0.2

@@ -1,68 +1,10 @@
 import random
 import operator
 
-from .tree import Node, STATUS
-from app.utils.geometry import Vector
-from ..actions import MoveAction
-from ...utils.constants import Directions
+from app.utils.constants import Directions
+from ..tree import Node, STATUS
 
-
-class InspectNeighbours(Node):
-    tag = 'inspect-neighbours'
-
-    def update(self, actor, game):
-        neighbour_tiles = [
-            Vector.copy(vec)
-            for vec in actor.position.neighbours
-            if actor.position.is_orthogonal_neighbours(vec) and vec in game.map
-        ]
-        neighbours = []
-        for other in game.creatures.values():
-            if other.position in neighbour_tiles:
-                neighbours.append(other)
-                if len(neighbours) == 4:
-                    break
-
-        if not neighbours:
-            return STATUS.FAILURE
-
-        actor.blackboard['neighbours'] = neighbours
-        return STATUS.SUCCESS
-
-
-class SelectNeighbour(Node):
-    tag = 'select-neighbour'
-
-    def __init__(self, kind='any'):
-        super().__init__()
-        self.kind = kind
-
-    def update(self, actor, game):
-        neighbours = actor.blackboard.get('neighbours')
-        if neighbours is None:
-            return STATUS.FAILURE
-
-        if self.kind == 'enemy':
-            neighbours = [neighbour for neighbour in neighbours if neighbour.group != actor.group]
-        elif self.kind == 'friend':
-            neighbours = [neighbour for neighbour in neighbours if neighbour.group == actor.group]
-
-        if not neighbours:
-            return STATUS.FAILURE
-
-        actor.blackboard['selected_actor'] = random.choice(neighbours)
-        return STATUS.SUCCESS
-
-
-class SelectInspected(Node):
-    tag = 'select-inspected'
-
-    def update(self, actor, game):
-        if (inspected_actor := actor.blackboard.get('inspected_actor')) is Node:
-            return STATUS.FAILURE
-
-        actor.blackboard['selected_actor'] = inspected_actor
-        return STATUS.SUCCESS
+from .constants import MOVE_DIRECTION, SELECTED_ACTOR, INSPECTED_ACTOR, FOUND_ACTORS
 
 
 class PrepareToBattle(Node):
@@ -86,11 +28,13 @@ class CalculateAttackDirection(Node):
     tag = 'calculate-attack-direction'
 
     def update(self, actor, game):
-        target = actor.blackboard.get('selected_actor')
+        target = actor.recall_knowledge(SELECTED_ACTOR)
         if target is None:
             return STATUS.FAILURE
 
-        actor.blackboard['move_direction'] = Directions.from_vectors(actor.position, target.position)
+        actor.remember_knowledge(
+            MOVE_DIRECTION, Directions.from_vectors(actor.position, target.position)
+        )
         return STATUS.SUCCESS
 
 
@@ -98,8 +42,7 @@ class CalculateFleeDirection(Node):
     tag = 'calculate-flee-direction'
 
     def update(self, actor, game):
-        threat = actor.blackboard.get('selected_actor')
-        if threat is None:
+        if (threat := actor.recall_knowledge(SELECTED_ACTOR)) is None:
             return STATUS.FAILURE
 
         direction_to_attacker = Directions.from_vectors(actor.position, threat.position)
@@ -114,62 +57,7 @@ class CalculateFleeDirection(Node):
         if not available_directions:
             return STATUS.FAILURE
 
-        actor.blackboard['move_direction'] = random.choice(available_directions)
-        return STATUS.SUCCESS
-
-
-class CalculateRandomDirection(Node):
-    tag = 'calculate-random-direction'
-
-    def update(self, actor, game):
-        available_directions = [
-            direction
-            for direction in Directions.choices()
-            if game.is_available_position(*(actor.position + Directions.delta(direction)))
-        ]
-
-        if not available_directions:
-            return STATUS.FAILURE
-
-        actor.blackboard['move_direction'] = random.choice(available_directions)
-        return STATUS.SUCCESS
-
-
-class CalculatePreviousDirection(Node):
-    tag = 'calculate-previous-direction'
-
-    def update(self, actor, game):
-        for action in reversed(actor.last_actions):
-            if isinstance(action, MoveAction):
-                actor.blackboard['move_direction'] = action.direction
-                return STATUS.SUCCESS
-
-        return STATUS.FAILURE
-
-
-class CheckDirection(Node):
-    tag = 'check-direction'
-
-    def update(self, actor, game):
-        direction = actor.blackboard.get('move_direction')
-        if direction is None:
-            return STATUS.FAILURE
-
-        if game.is_available_position(*(actor.position + Directions.delta(direction))) is True:
-            return STATUS.SUCCESS
-
-        return STATUS.FAILURE
-
-
-class Move(Node):
-    tag = 'move'
-
-    def update(self, actor, game):
-        direction = actor.blackboard.get('move_direction')
-        if direction is None:
-            return STATUS.FAILURE
-
-        game.move_creature(actor.id, direction)
+        actor.remember_knowledge(MOVE_DIRECTION, random.choice(available_directions))
         return STATUS.SUCCESS
 
 
@@ -224,7 +112,7 @@ class Inspect(Node):
     def update(self, actor, game):
         succeed_on_any = True
         if self.target in ('any', 'all'):
-            actors = actor.blackboard.get('neighbours')
+            actors = actor.recall_knowledge(FOUND_ACTORS)
             if self.target == 'all':
                 succeed_on_any = False
 
@@ -232,7 +120,7 @@ class Inspect(Node):
             if self.target == 'self':
                 actors = [actor]
             else:
-                actors = [actor.blackboard.get(self.target)]
+                actors = [actor.recall_knowledge(self.target)]
 
         if not actors:
             return STATUS.FAILURE
@@ -242,9 +130,10 @@ class Inspect(Node):
                 value = getattr(checked_actor, self.attribute)
                 check_result = self.OPERATORS[self.operator](value, self.calculate_operand(checked_actor))
                 if check_result:
-                    actor.blackboard['inspected_actor'] = checked_actor
+                    actor.remember_knowledge(INSPECTED_ACTOR, checked_actor)
                     return STATUS.SUCCESS
 
+                actor.forget_knowledge(INSPECTED_ACTOR)
                 return STATUS.FAILURE
 
         for checked_actor in actors:
@@ -263,7 +152,7 @@ class Include(Node):
         self.subtree_name = subtree_name
 
     def update(self, actor, game):
-        from .loader import get_tree
+        from ..loader import get_tree
         return get_tree(self.subtree_name).update(actor, game)
 
 

@@ -1,0 +1,6 @@
+MOVE_DIRECTION = 'move_direction'
+MOVEMENT_PATH = 'movement_path'
+MOVEMENT_DESTINATION = 'movement_destination'
+FOUND_ACTORS = 'found_actors'
+SELECTED_ACTOR = 'selected_actor'
+INSPECTED_ACTOR = 'inspected_actor'

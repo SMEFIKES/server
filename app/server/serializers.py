@@ -79,7 +79,7 @@ class VectorSerializer(Schema):
     y = fields.Integer()
 
 
-class CreatureSerializer(Schema):
+class ActorSerializer(Schema):
     id = fields.String()
     name = fields.String()
     kind = fields.String()
@@ -101,13 +101,13 @@ class ConnectResponseSerializer(Schema):
 
 class OtherPlayerConnectedResponseSerializer(Schema):
     type = fields.Constant('player_connected', dump_only=True)
-    player = fields.Nested(CreatureSerializer)
+    player = fields.Nested(ActorSerializer)
 
 
 class GameInitializedResponseSerializer(Schema):
     type = fields.Constant('game_initialized', dump_only=True)
-    players = fields.Nested(CreatureSerializer, many=True)
-    creatures = fields.Nested(CreatureSerializer, many=True)
+    players = fields.Nested(ActorSerializer, many=True)
+    actors = fields.Nested(ActorSerializer, many=True)
     map = fields.Nested(MapSerializer)
 
 
@@ -115,21 +115,21 @@ class MoveResponseSerializer(Schema):
     type = fields.Constant('move', dump_only=True)
     success = fields.Boolean()
     previous_position = fields.Nested(VectorSerializer)
-    actor = fields.Nested(CreatureSerializer)
+    actor = fields.Nested(ActorSerializer)
 
 
 class AttackResponseSerializer(Schema):
     type = fields.Constant('attack', dump_only=True)
     success = fields.Boolean()
-    actor = fields.Nested(CreatureSerializer)
-    defender = fields.Nested(CreatureSerializer)
+    actor = fields.Nested(ActorSerializer)
+    defender = fields.Nested(ActorSerializer)
     defender_alive = fields.Boolean()
     damage = fields.Integer()
 
 
 class PrepareToBattleResponseSerializer(Schema):
     type = fields.Constant('prepare_to_battle', dump_only=True)
-    actor = fields.Nested(CreatureSerializer)
+    actor = fields.Nested(ActorSerializer)
     subtype = fields.String(attribute='type')
     energy = fields.Method('get_energy')
 
@@ -141,7 +141,7 @@ class GameUpdateResponseSerializer(Schema):
     type = fields.Constant('update', dump_only=True)
     time = fields.Integer(attribute='game.time')
     actions = fields.Method('get_actions')
-    players = fields.Nested(CreatureSerializer, many=True)
+    players = fields.Nested(ActorSerializer, many=True)
 
     def get_actions(self, data):
         if actions := data['actions']:

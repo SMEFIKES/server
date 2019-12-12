@@ -2,19 +2,19 @@ from __future__ import annotations
 
 import uuid
 import random
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Dict
 
 if TYPE_CHECKING:
     from .actions import BaseAction
 from app.utils.geometry import Vector
 
 
-class Creature:
+class Actor:
     def __init__(self, name, kind):
         self.id = uuid.uuid4().hex
         self.name = name
         self.kind = kind
-        self.group = 0
+        self.faction = 0
         self.position = Vector(0, 0)
         self.next_action_time = 0
         self.last_action_time = 0
@@ -28,7 +28,7 @@ class Creature:
         self.actions_in_round = 0
         self.exhausted = False
         self.last_actions = []
-        self.blackboard = {}
+        self._blackboard = {}
 
     def get_attack(self):
         return max(1, self.attack_energy)
@@ -47,17 +47,23 @@ class Creature:
         self.actions_in_round += 1
         self.last_action_time = action.occurrence_time
 
-        if isinstance(action.time_cost, tuple):
-            time_to_next_action = random.randint(*action.time_cost)
-        else:
-            time_to_next_action = action.time_cost
-
-        self.next_action_time = action.occurrence_time + time_to_next_action
         self.stamina -= 2 * self.actions_in_round * action.stamina_cost
 
         self.last_actions.append(action)
         if len(self.last_actions) > 5:
             self.last_actions.pop(0)
+
+        if not self.is_fast:
+            if isinstance(action.time_cost, tuple):
+                time_to_next_action = random.randint(*action.time_cost)
+            else:
+                time_to_next_action = action.time_cost
+
+            self.next_action_time = action.occurrence_time + time_to_next_action
+
+    @property
+    def is_fast(self):
+        return self.kind == 'player'
 
     @property
     def last_action(self):
@@ -81,3 +87,18 @@ class Creature:
     def acted(self):
         return self.actions_in_round > 0
 
+    def recall_knowledge(self, key):
+        return self._blackboard.get(key)
+
+    def remember_knowledge(self, key, value):
+        self._blackboard[key] = value
+
+    def forget_knowledge(self, key):
+        self._blackboard.pop(key, None)
+
+
+class Squad(Actor):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.brawlers: Dict[str, Actor] = {}

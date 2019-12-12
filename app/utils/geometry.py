@@ -89,6 +89,20 @@ class Vector:
         result.y = self.y - 1
         yield result
 
+    @property
+    def orthogonal_neighbours(self):
+        result = Vector(self.x, self.y - 1)
+        yield result
+        result.x = self.x + 1
+        result.y = self.y
+        yield result
+        result.x = self.x
+        result.y = self.y + 1
+        yield result
+        result.x = self.x - 1
+        result.y = self.y
+        yield result
+
     def equals(self, x, y):
         return self.x == x and self.y == y
 
@@ -178,3 +192,81 @@ class Rectangle:
         result.x = int(result.x)
         result.y = int(result.y)
         return result
+
+
+def ellipse_iterator(center_x, center_y, horizontal_radius, vertical_radius):
+    x = 0
+    y = vertical_radius
+
+    dx = 2 * vertical_radius * vertical_radius * x
+    dy = 2 * horizontal_radius * horizontal_radius * y
+
+    output = Vector(0, 0)
+
+    d1 = (
+        (vertical_radius * vertical_radius)
+        - (horizontal_radius * horizontal_radius * vertical_radius)
+        + (0.25 * horizontal_radius * horizontal_radius)
+    )
+    while dx < dy:
+        for i in range(0, x + 1):
+            output.x = i + center_x
+            output.y = y + center_y
+            yield output
+
+            output.x = -i + center_x
+            output.y = y + center_y
+            yield output
+
+            output.x = i + center_x
+            output.y = -y + center_y
+            yield output
+
+            output.x = -i + center_x
+            output.y = -y + center_y
+            yield output
+
+        if d1 < 0:
+            x += 1
+            dx = dx + (2 * vertical_radius * vertical_radius)
+            d1 = d1 + dx + (vertical_radius * vertical_radius)
+        else:
+            x += 1
+            y -= 1
+            dx = dx + (2 * vertical_radius * vertical_radius)
+            dy = dy - (2 * horizontal_radius * horizontal_radius)
+            d1 = d1 + dx - dy + (vertical_radius * vertical_radius)
+
+    d2 = (
+        ((vertical_radius * vertical_radius) * ((x + 0.5) * (x + 0.5)))
+        + ((horizontal_radius * horizontal_radius) * ((y - 1) * (y - 1)))
+        - (horizontal_radius * horizontal_radius * vertical_radius * vertical_radius)
+    )
+    while y >= 0:
+        for i in range(0, x + 1):
+            output.x = i + center_x
+            output.y = y + center_y
+            yield output
+
+            output.x = -i + center_x
+            output.y = y + center_y
+            yield output
+
+            output.x = i + center_x
+            output.y = -y + center_y
+            yield output
+
+            output.x = -i + center_x
+            output.y = -y + center_y
+            yield output
+
+        if (d2 > 0):
+            y -= 1
+            dy = dy - (2 * horizontal_radius * horizontal_radius)
+            d2 = d2 + (horizontal_radius * horizontal_radius) - dy
+        else:
+            y -= 1
+            x += 1
+            dx = dx + (2 * vertical_radius * vertical_radius)
+            dy = dy - (2 * horizontal_radius * horizontal_radius)
+            d2 = d2 + dx - dy + (horizontal_radius * horizontal_radius)

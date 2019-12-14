@@ -23,7 +23,7 @@ class GameHandler:
             self.region_size.y * self.world_size.y,
             Tile.GROUND
         )
-        self._actors_positions: Dict[Tuple[int, int], Actor] = {}
+        self._actors_positions: Dict[Tuple[int, int], Optional[Actor]] = {}
         self._to_kill = []
 
     async def initialize(self):

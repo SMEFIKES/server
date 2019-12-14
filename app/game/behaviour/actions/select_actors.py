@@ -1,7 +1,7 @@
 import random
 
 from app.game.behaviour.tree import Node, STATUS
-from app.utils.geometry import Vector, ellipse_iterator
+from app.utils.geometry import Vector
 from .constants import FOUND_ACTORS, SELECTED_ACTOR, INSPECTED_ACTOR
 
 
@@ -37,13 +37,15 @@ class FindAround(Node):
         self.vertical_radius = vertical_radius or horizontal_radius
 
     def update(self, actor, game):
-        found_actors = [
-            found
-            for position in ellipse_iterator(
-                actor.position.x, actor.position.y, self.horizontal_radius, self.vertical_radius
-            )
-            if (found := game.get_actor_at(position))
-        ]
+        found_actors = []
+        pos = Vector(0, 0)
+
+        for x in range(actor.position.x - self.horizontal_radius, actor.position.y + self.horizontal_radius):
+            for y in range(actor.position.y - self.vertical_radius, actor.position.y + self.vertical_radius):
+                pos.x = x
+                pos.y = y
+                if found := game.get_actor_at(pos):
+                    found_actors.append(found)
 
         if not found_actors:
             actor.forget_knowledge(FOUND_ACTORS)
@@ -53,24 +55,75 @@ class FindAround(Node):
         return STATUS.SUCCESS
 
 
-class SelectOne(Node):
-    tag = 'select-one'
+class SortActors(Node):
+    tag = 'sort-actors'
+
+    def __init__(self, sorting_key: str):
+        super().__init__()
+        self.sorting_key = sorting_key
+
+    def update(self, actor, game):
+        if not (actors := actor.recall_knowledge(FOUND_ACTORS)):
+            return STATUS.FAILURE
+
+        reverse = False
+        sorting_key = self.sorting_key
+        if self.sorting_key.startswith('-'):
+            sorting_key = self.sorting_key[1:]
+            reverse = True
+
+        if sorting_key == 'distance':
+            def sorting_function(current):
+                return (current.position - actor.position).magnitude_squared
+
+        else:
+            def sorting_function(current):
+                return getattr(current, sorting_key)
+
+        actors.sort(key=sorting_function, reverse=reverse)
+        return STATUS.SUCCESS
+
+
+class FilterActors(Node):
+    tag = 'filter-actors'
 
     def __init__(self, kind='any'):
         super().__init__()
         self.kind = kind
 
     def update(self, actor, game):
-        if not (candidates := actor.recall_knowledge(FOUND_ACTORS)):
+        if not (actors := actor.recall_knowledge(FOUND_ACTORS)):
             return STATUS.FAILURE
 
         if self.kind == 'enemy':
-            candidates = [neighbour for neighbour in candidates if neighbour.faction != actor.faction]
+            actors = [candidate for candidate in actors if candidate.faction != actor.faction]
         elif self.kind == 'friend':
-            candidates = [neighbour for neighbour in candidates if neighbour.faction == actor.faction]
+            actors = [candidate for candidate in actors if candidate.faction == actor.faction]
 
-        if not candidates:
-            actor.forget_knowledge(SELECTED_ACTOR)
+        if not actors:
+            actor.forget_knowledge(FOUND_ACTORS)
+            return STATUS.FAILURE
+
+        actor.remember_knowledge(FOUND_ACTORS, actors)
+        return STATUS.SUCCESS
+
+
+class SelectFirst(Node):
+    tag = 'select-first'
+
+    def update(self, actor, game):
+        if not (candidates := actor.recall_knowledge(FOUND_ACTORS)):
+            return STATUS.FAILURE
+
+        actor.remember_knowledge(SELECTED_ACTOR, candidates[0])
+        return STATUS.SUCCESS
+
+
+class SelectAny(Node):
+    tag = 'select-any'
+
+    def update(self, actor, game):
+        if not (candidates := actor.recall_knowledge(FOUND_ACTORS)):
             return STATUS.FAILURE
 
         actor.remember_knowledge(SELECTED_ACTOR, random.choice(candidates))

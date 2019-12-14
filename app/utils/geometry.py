@@ -194,14 +194,28 @@ class Rectangle:
         return result
 
 
-def ellipse_iterator(center_x, center_y, horizontal_radius, vertical_radius):
-    x = 0
+def ellipse_iterator(center_x, center_y, horizontal_radius, vertical_radius, width_parameter=1):
+    output = Vector(center_x, center_y)
+    yield output
+
+    for x in range(1, horizontal_radius + 1):
+        output.x = center_x + x
+        yield output
+        output.x = center_y - x
+        yield output
+
+    output.x = center_x
+    for y in range(1, vertical_radius + 1):
+        output.y = center_y + y
+        yield output
+        output.y = center_y - y
+        yield output
+
+    x = 1
     y = vertical_radius
 
     dx = 2 * vertical_radius * vertical_radius * x
     dy = 2 * horizontal_radius * horizontal_radius * y
-
-    output = Vector(0, 0)
 
     d1 = (
         (vertical_radius * vertical_radius)
@@ -209,28 +223,28 @@ def ellipse_iterator(center_x, center_y, horizontal_radius, vertical_radius):
         + (0.25 * horizontal_radius * horizontal_radius)
     )
     while dx < dy:
-        for i in range(0, x + 1):
-            output.x = i + center_x
-            output.y = y + center_y
-            yield output
-
-            output.x = -i + center_x
-            output.y = y + center_y
-            yield output
-
-            output.x = i + center_x
-            output.y = -y + center_y
-            yield output
-
-            output.x = -i + center_x
-            output.y = -y + center_y
-            yield output
-
         if d1 < 0:
             x += 1
             dx = dx + (2 * vertical_radius * vertical_radius)
             d1 = d1 + dx + (vertical_radius * vertical_radius)
         else:
+            for _x in range(1, x + width_parameter):
+                output.x = center_x + _x
+                output.y = center_y + y
+                yield output
+
+                output.x = center_x - _x
+                output.y = center_y + y
+                yield output
+
+                output.x = center_x + _x
+                output.y = center_y - y
+                yield output
+
+                output.x = center_x - _x
+                output.y = center_y - y
+                yield output
+
             x += 1
             y -= 1
             dx = dx + (2 * vertical_radius * vertical_radius)
@@ -242,22 +256,22 @@ def ellipse_iterator(center_x, center_y, horizontal_radius, vertical_radius):
         + ((horizontal_radius * horizontal_radius) * ((y - 1) * (y - 1)))
         - (horizontal_radius * horizontal_radius * vertical_radius * vertical_radius)
     )
-    while y >= 0:
-        for i in range(0, x + 1):
-            output.x = i + center_x
-            output.y = y + center_y
+    while y > 0:
+        for _x in range(1, x + width_parameter):
+            output.x = center_x + _x
+            output.y = center_y + y
             yield output
 
-            output.x = -i + center_x
-            output.y = y + center_y
+            output.x = center_x - _x
+            output.y = center_y + y
             yield output
 
-            output.x = i + center_x
-            output.y = -y + center_y
+            output.x = center_x + _x
+            output.y = center_y - y
             yield output
 
-            output.x = -i + center_x
-            output.y = -y + center_y
+            output.x = center_x - _x
+            output.y = center_y - y
             yield output
 
         if (d2 > 0):

@@ -51,9 +51,13 @@ class Tree:
 
 class Node:
     tag = ''
+    input_in_blackboard = True
+    input_memory = ''
+    output_memory = ''
     
     def __init__(self):
         self.line_number = 0
+        self.comment = None
         self.parsed_arguments = None
         self.last_actor = None
         self.last_status = None

@@ -7,6 +7,7 @@ from .constants import FOUND_ACTORS, SELECTED_ACTOR, INSPECTED_ACTOR
 
 class FindNeighbours(Node):
     tag = 'find-neighbours'
+    output_memory = [FOUND_ACTORS]
 
     def update(self, actor, game):
         neighbour_tiles = [
@@ -21,15 +22,16 @@ class FindNeighbours(Node):
         ]
 
         if not neighbours:
-            actor.forget_knowledge(FOUND_ACTORS)
+            actor.forget_knowledge(self.output_memory)
             return STATUS.FAILURE
 
-        actor.remember_knowledge(FOUND_ACTORS, neighbours)
+        actor.remember_knowledge(self.output_memory, neighbours)
         return STATUS.SUCCESS
 
 
 class FindAround(Node):
     tag = 'find-around'
+    output_memory = [FOUND_ACTORS]
 
     def __init__(self, horizontal_radius, vertical_radius=None):
         super().__init__()
@@ -48,22 +50,23 @@ class FindAround(Node):
                     found_actors.append(found)
 
         if not found_actors:
-            actor.forget_knowledge(FOUND_ACTORS)
+            actor.forget_knowledge(self.output_memory)
             return STATUS.FAILURE
 
-        actor.remember_knowledge(FOUND_ACTORS, found_actors)
+        actor.remember_knowledge(self.output_memory, found_actors)
         return STATUS.SUCCESS
 
 
 class SortActors(Node):
     tag = 'sort-actors'
+    input_memory = [FOUND_ACTORS]
 
     def __init__(self, sorting_key: str):
         super().__init__()
         self.sorting_key = sorting_key
 
     def update(self, actor, game):
-        if not (actors := actor.recall_knowledge(FOUND_ACTORS)):
+        if not (actors := actor.recall_knowledge(self.input_memory, self.input_in_blackboard)):
             return STATUS.FAILURE
 
         reverse = False
@@ -86,13 +89,15 @@ class SortActors(Node):
 
 class FilterActors(Node):
     tag = 'filter-actors'
+    input_memory = [FOUND_ACTORS]
+    output_memory = [FOUND_ACTORS]
 
     def __init__(self, kind='any'):
         super().__init__()
         self.kind = kind
 
     def update(self, actor, game):
-        if not (actors := actor.recall_knowledge(FOUND_ACTORS)):
+        if not (actors := actor.recall_knowledge(self.input_memory, self.input_in_blackboard)):
             return STATUS.FAILURE
 
         if self.kind == 'enemy':
@@ -101,42 +106,48 @@ class FilterActors(Node):
             actors = [candidate for candidate in actors if candidate.faction == actor.faction]
 
         if not actors:
-            actor.forget_knowledge(FOUND_ACTORS)
+            actor.forget_knowledge(self.output_memory)
             return STATUS.FAILURE
 
-        actor.remember_knowledge(FOUND_ACTORS, actors)
+        actor.remember_knowledge(self.output_memory, actors)
         return STATUS.SUCCESS
 
 
 class SelectFirst(Node):
     tag = 'select-first'
+    input_memory = [FOUND_ACTORS]
+    output_memory = [SELECTED_ACTOR]
 
     def update(self, actor, game):
-        if not (candidates := actor.recall_knowledge(FOUND_ACTORS)):
+        if not (candidates := actor.recall_knowledge(self.input_memory, self.input_in_blackboard)):
             return STATUS.FAILURE
 
-        actor.remember_knowledge(SELECTED_ACTOR, candidates[0])
+        actor.remember_knowledge(self.output_memory, candidates[0])
         return STATUS.SUCCESS
 
 
 class SelectAny(Node):
     tag = 'select-any'
+    input_memory = [FOUND_ACTORS]
+    output_memory = [SELECTED_ACTOR]
 
     def update(self, actor, game):
-        if not (candidates := actor.recall_knowledge(FOUND_ACTORS)):
+        if not (candidates := actor.recall_knowledge(self.input_memory, self.input_in_blackboard)):
             return STATUS.FAILURE
 
-        actor.remember_knowledge(SELECTED_ACTOR, random.choice(candidates))
+        actor.remember_knowledge(self.output_memory, random.choice(candidates))
         return STATUS.SUCCESS
 
 
 class SelectInspected(Node):
     tag = 'select-inspected'
+    input_memory = [INSPECTED_ACTOR]
+    output_memory = [SELECTED_ACTOR]
 
     def update(self, actor, game):
-        if (inspected_actor := actor.recall_knowledge(INSPECTED_ACTOR)) is Node:
-            actor.forget_knowledge(SELECTED_ACTOR)
+        if (inspected_actor := actor.recall_knowledge(self.input_memory, self.input_in_blackboard)) is Node:
+            actor.forget_knowledge(self.output_memory)
             return STATUS.FAILURE
 
-        actor.remember_knowledge(SELECTED_ACTOR, inspected_actor)
+        actor.remember_knowledge(self.output_memory, inspected_actor)
         return STATUS.SUCCESS

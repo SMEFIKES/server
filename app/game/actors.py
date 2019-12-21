@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import uuid
 import random
-from typing import TYPE_CHECKING, Dict
+from typing import TYPE_CHECKING, Dict, List
 
 if TYPE_CHECKING:
     from .actions import BaseAction
@@ -87,14 +87,47 @@ class Actor:
     def acted(self):
         return self.actions_in_round > 0
 
-    def recall_knowledge(self, key):
-        return self._blackboard.get(key)
+    def recall_knowledge(self, path: List[str], in_blackboard):
+        if in_blackboard:
+            data = self._blackboard
+            for part in path:
+                data = data.get(part)
+                if part is None:
+                    return
 
-    def remember_knowledge(self, key, value):
-        self._blackboard[key] = value
+            return data
 
-    def forget_knowledge(self, key):
-        self._blackboard.pop(key, None)
+        obj = self
+        for part in path:
+            obj = getattr(obj, part, None)
+            if obj is None:
+                return
+
+        return obj
+
+    def remember_knowledge(self, path: List[str], value):
+        if len(path) == 1:
+            self._blackboard[path[0]] = value
+            return
+
+        data = self._blackboard
+        for part in path[:-1]:
+            data = data.setdefault(part, {})
+
+        data[path[-1]] = value
+
+    def forget_knowledge(self, path: List[str]):
+        if len(path) == 1:
+            self._blackboard.pop(path[0], None)
+            return
+
+        data = self._blackboard
+        for part in path[:-1]:
+            data = data.get(part)
+            if data is None:
+                return
+
+        data.pop(path[-1], None)
 
 
 class Squad(Actor):

@@ -97,8 +97,6 @@ class GameHandler:
         player = next(iter(self.players.values()))
         from .behaviour.actions.select_actors import FindNeighbours
         n = FindNeighbours()
-        print(n.update(player, self))
-        print(self.time, player.recall_knowledge('found_actors'))
 
         if self._to_kill:
             for actor_id in self._to_kill:

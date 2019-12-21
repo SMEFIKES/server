@@ -4,13 +4,13 @@
         -?-
             -->
                 inspect self hp <= 30%
-                select-one
+                select-any
                 calculate-flee-direction
                 move
 
             -->
                 inspect self prepared_to_attack is true
-                select-one
+                select-any
                 calculate-attack-direction
                 move
 
@@ -44,7 +44,7 @@
 
                     prepare-to-battle attack
             -->
-                select-one
+                select-any
                 -?-
                     -->
                         random 0.2
